@@ -13,6 +13,7 @@ use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 use std::str::FromStr;
 
+/// This is a random change
 /// The name of the environment variable that tells us the current variant. Variant-sensitive crates
 /// will need to be rebuilt if this changes. `Makefile.toml` emits the variant string in the
 /// `BUILDSYS_VARIANT` environment variable. This is then passed to crate builds by the `Dockerfile`
