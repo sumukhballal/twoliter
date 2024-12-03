@@ -1,12 +1,43 @@
 use flate2::{read::GzDecoder, write::GzEncoder};
-use std::env;
 use std::fs::File;
 use std::io::{self, prelude::*};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::{env, fs};
 use tar::Archive;
 
 const CRANE_VERSION: &str = "0.20.1";
+
+fn apply_source_patches(source_path: impl AsRef<Path>, patch_dir: impl AsRef<Path>) {
+    let source_path = source_path.as_ref();
+    let patch_dir = patch_dir.as_ref();
+
+    which::which("patch").expect("Must have the `patch` utility installed in PATH");
+
+    let mut patches = fs::read_dir(patch_dir)
+        .expect("Failed to read patch directory")
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().map(|ext| ext == "patch").unwrap_or(false))
+        .collect::<Vec<_>>();
+    patches.sort();
+
+    for patch in patches {
+        println!("Executing `patch -p1 -i '{}'`", patch.display());
+
+        let patch_status = Command::new("patch")
+            .current_dir(source_path)
+            .arg("-p1")
+            .arg("-i")
+            .arg(patch.as_os_str())
+            .status()
+            .expect("Failed to execute patch command");
+
+        if !patch_status.success() {
+            panic!("Failed to apply patch '{}'", patch.display());
+        }
+    }
+}
 
 fn main() {
     let script_dir = env::current_dir().unwrap();
@@ -14,6 +45,7 @@ fn main() {
 
     println!("cargo::rerun-if-changed=../build-cache-fetch");
     println!("cargo::rerun-if-changed=hashes/crane");
+    println!("cargo::rerun-if-changed=patches");
 
     // Download and checksum-verify crane
     env::set_current_dir(&out_dir).expect("Failed to set current directory");
@@ -32,6 +64,10 @@ fn main() {
         .unpack(&crane_output_dir)
         .expect("Failed to extract crane sources");
 
+    // Perform any local modifications
+    let crane_source_dir = crane_output_dir.join(format!("go-containerregistry-{CRANE_VERSION}"));
+    apply_source_patches(&crane_source_dir, script_dir.join("patches"));
+
     // build krane
     let build_output_loc = out_dir.join("krane");
     Command::new("go")
@@ -40,9 +76,7 @@ fn main() {
         .env("GOARCH", get_goarch())
         .arg("-o")
         .arg(&build_output_loc)
-        .current_dir(
-            crane_output_dir.join(format!("go-containerregistry-{CRANE_VERSION}/cmd/krane")),
-        )
+        .current_dir(crane_source_dir.join("cmd/krane"))
         .status()
         .expect("Failed to build crane");
 
