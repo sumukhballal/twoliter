@@ -154,7 +154,7 @@ fn build_system_env_vars() -> Result<Vec<String>> {
 
 /// A list of environment variables that don't conform to naming conventions but need to be passed
 /// through to the `cargo make` invocation.
-const ENV_VARS: [&str; 23] = [
+const ENV_VARS: &[&str] = &[
     "ALLOW_MISSING_KEY",
     "AMI_DATA_FILE_SUFFIX",
     "CARGO_MAKE_CARGO_ARGS",
@@ -180,7 +180,7 @@ const ENV_VARS: [&str; 23] = [
     "no_proxy",
 ];
 
-const DISALLOWED_ENV_VARS: [&str; 4] = [
+const DISALLOWED_ENV_VARS: &[&str] = &[
     "BUILDSYS_SDK_NAME",
     "BUILDSYS_SDK_VERSION",
     "BUILDSYS_REGISTRY",
