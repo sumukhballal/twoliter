@@ -7,7 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-[unreleased]: https://github.com/bottlerocket-os/twoliter/compare/v0.5.1...HEAD
+[unreleased]: https://github.com/bottlerocket-os/twoliter/compare/v0.5.2...HEAD
+
+## [0.5.2] - 2024-12-03
+
+### Changed
+
+- Use `krane` to fetch the SDK during the build instead of `docker` ([#411])
+- Enable verbose `krane` logs when the log level is DEBUG or TRACE ([#411])
+- Update `ecr-login` to v0.9.0 ([#411])
+
+[#411]: https://github.com/bottlerocket-os/twoliter/pull/411
+
+[0.5.2]: https://github.com/bottlerocket-os/twoliter/compare/v0.5.1...v0.5.2
 
 ## [0.5.1] - 2024-11-11
 

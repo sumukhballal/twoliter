@@ -1904,6 +1904,7 @@ dependencies = [
  "lazy_static",
  "tar",
  "tempfile",
+ "which",
 ]
 
 [[package]]
@@ -3856,7 +3857,7 @@ dependencies = [
 
 [[package]]
 name = "twoliter"
-version = "0.5.1"
+version = "0.5.2-rc1"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -3871,6 +3872,7 @@ dependencies = [
  "filetime",
  "flate2",
  "futures",
+ "krane-bundle",
  "log",
  "oci-cli-wrapper",
  "olpc-cjson",
