@@ -3871,6 +3871,7 @@ dependencies = [
  "filetime",
  "flate2",
  "futures",
+ "krane-bundle",
  "log",
  "oci-cli-wrapper",
  "olpc-cjson",

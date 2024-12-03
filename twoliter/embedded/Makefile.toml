@@ -315,13 +315,23 @@ dependencies = ["setup-build"]
 script_runner = "bash"
 script = [
 '''
+SDK_PLATFORM="$(docker version --format '{{.Server.Os}}/{{.Server.Arch}}')"
+KRANE="${TWOLITER_TOOLS_DIR}/krane"
+
 if [ ! -s "${BUILDSYS_EXTERNAL_KITS_DIR}/.sdk-verified" ]; then
    echo "Twoliter could not validate '${TLPRIVATE_SDK_IMAGE}', refusing to continue" >&2
    exit 1
 fi
 if ! docker image inspect "${TLPRIVATE_SDK_IMAGE}" >/dev/null 2>&1 ; then
-  if ! docker pull "${TLPRIVATE_SDK_IMAGE}" ; then
+  echo "Pulling SDK '${TLPRIVATE_SDK_IMAGE}'"
+  ${KRANE} pull "${TLPRIVATE_SDK_IMAGE}" /dev/stdout --platform "${SDK_PLATFORM}" \
+    | docker load
+  if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
     echo "failed to pull '${TLPRIVATE_SDK_IMAGE}'" >&2
+    exit 1
+  fi
+  if [[ ${PIPESTATUS[1]} -ne 0 ]]; then
+    echo "failed to load '${TLPRIVATE_SDK_IMAGE}' into docker daemon" >&2
     exit 1
   fi
 fi

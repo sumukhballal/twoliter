@@ -21,6 +21,7 @@ env_logger.workspace = true
 filetime.workspace = true
 flate2.workspace = true
 futures.workspace = true
+krane-bundle.workspace = true
 log.workspace = true
 oci-cli-wrapper.workspace = true
 olpc-cjson.workspace = true
