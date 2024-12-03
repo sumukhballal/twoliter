@@ -11,24 +11,27 @@ pub(crate) struct CommandLine {
 
 impl CommandLine {
     pub(crate) async fn output(&self, args: &[&str], error_msg: String) -> Result<Vec<u8>> {
-        log::debug!(
-            "Executing '{}' with args [{}]",
-            self.path.display(),
+        let debug_cmd = [
+            vec![format!("{}", self.path.display())],
             args.iter()
                 .map(|arg| format!("'{}'", arg))
-                .collect::<Vec<_>>()
-                .join(", ")
-        );
+                .collect::<Vec<_>>(),
+        ]
+        .concat()
+        .join(", ");
+
+        log::debug!("Executing [{debug_cmd}]",);
         let output = Command::new(&self.path)
             .args(args)
             .output()
             .await
             .context(error::CommandFailedSnafu { message: error_msg })?;
+
         ensure!(
             output.status.success(),
             error::OperationFailedSnafu {
                 message: format!(
-                    "status: {} stderr: {} stdout: {}",
+                    "[{debug_cmd}]: status: {} stderr: {} stdout: {}",
                     &output.status,
                     String::from_utf8_lossy(&output.stderr),
                     String::from_utf8_lossy(&output.stdout)
@@ -37,10 +40,16 @@ impl CommandLine {
                 args: args.iter().map(|x| x.to_string()).collect::<Vec<_>>()
             }
         );
+
         log::debug!(
-            "stdout: {}",
+            "[{debug_cmd}] stdout: {}",
             String::from_utf8_lossy(&output.stdout).to_string()
         );
+        log::debug!(
+            "[{debug_cmd}] stderr: {}",
+            String::from_utf8_lossy(&output.stderr).to_string()
+        );
+
         Ok(output.stdout)
     }
 

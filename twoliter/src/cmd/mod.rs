@@ -75,8 +75,10 @@ pub(super) fn init_logger(level: Option<LevelFilter>) {
             Builder::from_default_env().init();
         }
         _ => {
+            // Use RUST_LOG if it exists for dependencies.
             // use provided log level or default for this crate only.
             Builder::new()
+                .parse_default_env()
                 .filter(
                     Some(env!("CARGO_CRATE_NAME")),
                     level.unwrap_or(DEFAULT_LEVEL_FILTER),

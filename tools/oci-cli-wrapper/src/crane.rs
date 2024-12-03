@@ -15,13 +15,24 @@ pub struct CraneCLI {
     pub(crate) cli: CommandLine,
 }
 
+impl CraneCLI {
+    /// Enables verbose logging of crane if debug logging is enabled.
+    fn crane_cmd<'a>(cmd: &[&'a str]) -> Vec<&'a str> {
+        if log::max_level() >= log::LevelFilter::Debug {
+            [&["-v"], cmd].concat()
+        } else {
+            cmd.into()
+        }
+    }
+}
+
 #[async_trait]
 impl ImageToolImpl for CraneCLI {
     async fn pull_oci_image(&self, path: &Path, uri: &str) -> Result<()> {
         let archive_path = path.to_string_lossy();
         self.cli
             .spawn(
-                &["pull", "--format", "oci", uri, archive_path.as_ref()],
+                &Self::crane_cmd(&["pull", "--format", "oci", uri, archive_path.as_ref()]),
                 format!("failed to pull image archive from {}", uri),
             )
             .await?;
@@ -31,7 +42,7 @@ impl ImageToolImpl for CraneCLI {
     async fn get_manifest(&self, uri: &str) -> Result<Vec<u8>> {
         self.cli
             .output(
-                &["manifest", uri],
+                &Self::crane_cmd(&["manifest", uri]),
                 format!("failed to fetch manifest for resource at {}", uri),
             )
             .await
@@ -41,7 +52,7 @@ impl ImageToolImpl for CraneCLI {
         let bytes = self
             .cli
             .output(
-                &["config", uri],
+                &Self::crane_cmd(&["config", uri]),
                 format!("failed to fetch image config from {}", uri),
             )
             .await?;
@@ -61,7 +72,7 @@ impl ImageToolImpl for CraneCLI {
             .context(error::ArchiveExtractSnafu)?;
         self.cli
             .spawn(
-                &["push", &temp_dir.path().to_string_lossy(), uri],
+                &Self::crane_cmd(&["push", &temp_dir.path().to_string_lossy(), uri]),
                 format!("failed to push image {}", uri),
             )
             .await
@@ -84,7 +95,7 @@ impl ImageToolImpl for CraneCLI {
         manifest_create_args.extend_from_slice(&["-t", uri]);
         self.cli
             .output(
-                &manifest_create_args,
+                &Self::crane_cmd(&manifest_create_args),
                 format!("could not push multi-platform manifest to {}", uri),
             )
             .await?;
