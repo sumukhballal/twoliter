@@ -13,6 +13,7 @@ BUILDSYS_BUILD_DIR = "${BUILDSYS_ROOT_DIR}/build"
 BUILDSYS_PACKAGES_DIR = "${BUILDSYS_BUILD_DIR}/rpms"
 BUILDSYS_KITS_DIR = "${BUILDSYS_BUILD_DIR}/kits"
 BUILDSYS_EXTERNAL_KITS_DIR = "${BUILDSYS_BUILD_DIR}/external-kits"
+BUILDSYS_EXTERNAL_SDKS_DIR = "${BUILDSYS_BUILD_DIR}/external-sdk-archives"
 BUILDSYS_STATE_DIR = "${BUILDSYS_BUILD_DIR}/state"
 BUILDSYS_IMAGES_DIR = "${BUILDSYS_BUILD_DIR}/images"
 BUILDSYS_LOGS_DIR = "${BUILDSYS_BUILD_DIR}/logs"
@@ -315,22 +316,32 @@ dependencies = ["setup-build"]
 script_runner = "bash"
 script = [
 '''
+
+cleanup() {
+   [ -n "${SDK_ARCHIVE_PATH}" ] && rm -rf "${SDK_ARCHIVE_PATH}"
+}
+
+trap 'cleanup' EXIT
+
 SDK_PLATFORM="$(docker version --format '{{.Server.Os}}/{{.Server.Arch}}')"
 KRANE="${TWOLITER_TOOLS_DIR}/krane"
+
+mkdir -p "${BUILDSYS_EXTERNAL_SDKS_DIR}"
+SDK_ARCHIVE_PATH="$(mktemp -p ${BUILDSYS_EXTERNAL_SDKS_DIR} bottlerocket-sdk-tmp-archive-XXXXXXXX.tar)"
 
 if [ ! -s "${BUILDSYS_EXTERNAL_KITS_DIR}/.sdk-verified" ]; then
    echo "Twoliter could not validate '${TLPRIVATE_SDK_IMAGE}', refusing to continue" >&2
    exit 1
 fi
+
 if ! docker image inspect "${TLPRIVATE_SDK_IMAGE}" >/dev/null 2>&1 ; then
   echo "Pulling SDK '${TLPRIVATE_SDK_IMAGE}'"
-  ${KRANE} pull "${TLPRIVATE_SDK_IMAGE}" /dev/stdout --platform "${SDK_PLATFORM}" \
-    | docker load
-  if [[ ${PIPESTATUS[0]} -ne 0 ]]; then
+  if ! ${KRANE} pull "${TLPRIVATE_SDK_IMAGE}" "${SDK_ARCHIVE_PATH}" --platform "${SDK_PLATFORM}" ; then
     echo "failed to pull '${TLPRIVATE_SDK_IMAGE}'" >&2
     exit 1
   fi
-  if [[ ${PIPESTATUS[1]} -ne 0 ]]; then
+
+  if ! docker load --input "${SDK_ARCHIVE_PATH}" ; then
     echo "failed to load '${TLPRIVATE_SDK_IMAGE}' into docker daemon" >&2
     exit 1
   fi
