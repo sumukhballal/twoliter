@@ -186,61 +186,55 @@ INVENTORY_DATA="$(jq --raw-output . <<<"${installed_rpms[@]}")"
 # Sort by package name and add 'Content' as top-level.
 INVENTORY_DATA="$(jq --slurp 'sort_by(.Name)' <<<"${INVENTORY_DATA}" | jq '{"Content": .}')"
 
-# Get the core kit version and vendor from external kit metadata.
+# Iterate through all kits used to build this variant.
 EXTERNAL_KIT_METADATA_PATH="${EXTERNAL_KITS_PATH}/external-kit-metadata.json"
-CORE_KIT_VERSION=$(jq --raw-output '.kit[]|select(.name == "bottlerocket-core-kit")|.version' "${EXTERNAL_KIT_METADATA_PATH}")
-CORE_KIT_VENDOR=$(jq --raw-output '.kit[]|select(.name == "bottlerocket-core-kit")|.vendor' "${EXTERNAL_KIT_METADATA_PATH}")
-# Set the path inside the build container to the core kit RPMs and repo.
-CORE_KIT_PATH="${EXTERNAL_KITS_PATH}/${CORE_KIT_VENDOR}/bottlerocket-core-kit/${ARCH}"
-
-if [[ -n "${CORE_KIT_VERSION}" && -n "${CORE_KIT_VENDOR}" ]]; then
-  # Query the bottlerocket-core-kit repo for a single package's Release in order
-  # to extract the commit that built the core kit.
-  CORE_KIT_GIT_SHA="$(dnf --repofrompath \
-    core-kit,file://"${CORE_KIT_PATH}" \
-    --repo=core-kit repoquery \
-    --queryformat '%{Buildtime} %{Release}' 2>/dev/null | \
-    sort -k 1,2 | \
-    awk -F '.' 'END {print $--NF}')"
-  if [[ -z "${CORE_KIT_GIT_SHA}" ]]; then
-    echo "Could not find Git sha for bottlerocket-core-kit" >&2
-    exit 1
+mapfile -t kits < <(jq -r ".kit[].name" "${EXTERNAL_KIT_METADATA_PATH}")
+for kit in "${kits[@]}"; do
+  kit_version=$(jq --arg kit "${kit}" --raw-output '.kit[]|select(.name == $kit)|.version' "${EXTERNAL_KIT_METADATA_PATH}")
+  kit_vendor=$(jq --arg kit "${kit}" --raw-output '.kit[]|select(.name == $kit)|.vendor' "${EXTERNAL_KIT_METADATA_PATH}")
+  if [[ -z "${kit_version}" ]]; then
+      echo "Failed to extract version of kit '${kit}'" >&2
+      exit 1
   fi
-  # If the Git sha contains whitespace, we may have accidentally grabbed multiple
-  if [[ "${CORE_KIT_GIT_SHA}" =~ [[:space:]] ]]; then
-    echo "Extracted invalid Git sha from bottlerocket-core-kit: '${CORE_KIT_GIT_SHA}'" >&2
-    exit 1
+  if [[ -z "${kit_vendor}" ]]; then
+      echo "Failed to extract vendor of kit '${kit}'" >&2
+      exit 1
   fi
 
-  # Query the bottlerocket-core-kit repo of RPMs for all package names.
-  CORE_KIT_INVENTORY_QUERY="%{NAME}"
+  # Set the path inside the build container to the kit RPMs and repo.
+  kit_path="${EXTERNAL_KITS_PATH}/${kit_vendor}/${kit}/${ARCH}"
+
+  # Query the kit repo of RPMs for all package names.
+  kit_inventory_query="%{NAME}"
   # shellcheck disable=SC2312 # Array is validated elsewhere.
-  mapfile -t CORE_KIT_PKGS <<<"$(dnf --repofrompath \
-    core-kit,file://"${CORE_KIT_PATH}" \
-    --repo=core-kit repoquery \
-    --queryformat "${CORE_KIT_INVENTORY_QUERY}")"
-  # Convert the bash array of core kit packages to a JSON array.
-  CORE_KIT_LIST="$(\
+  mapfile -t KIT_PKGS <<<"$(dnf --repofrompath \
+    kit,file://"${kit_path}" \
+    --repo=kit repoquery \
+    --queryformat "${kit_inventory_query}")"
+  # Convert the bash array of kit packages to a JSON array.
+  kit_list="$(\
     jq \
       --null-input \
       --compact-output \
       '$ARGS.positional // []' \
-      --args "${CORE_KIT_PKGS[@]}")"
+      --args "${KIT_PKGS[@]}")"
 
   # Convert the JSON array to a map of 'bottlerocket-' prefixed names to unprefixed package names
   # for search and replace in the installed application inventory.
   jq \
     --compact-output \
-    'map({ (.|tostring): (.|sub("^bottlerocket-";""))}) | add' <<<"${CORE_KIT_LIST}" \
-    > core-kit-replacements.json
+    'map({ (.|tostring): (.|sub("^bottlerocket-";""))}) | add' <<<"${kit_list}" \
+    > kit-replacements.json
 
-  # For any packages in the installed app inventory that exist in the core kit, replace
-  # the version with the core kit's version, and replace the name with the unprefixed name.
+  # For any packages in the installed app inventory that came from the kit, replace
+  # the Publisher with the kit's vendor and replace the name with the unprefixed name.
   INVENTORY_DATA="$(jq \
-    --argfile replace core-kit-replacements.json \
-     '.Content[].Name |= (if $replace[.] then $replace[.] else . end)' \
+    --slurpfile replace kit-replacements.json \
+    --arg KIT "${kit}" \
+    '(.Content[] | select(.Name | $replace[][.] != null) | .Publisher) = $KIT |
+      .Content[].Name |= (if $replace[][.] then $replace[][.] else . end)' \
     <<<"${INVENTORY_DATA}")"
-fi
+done
 
 # Verify we successfully inventoried some RPMs.
 INVENTORY_COUNT="$(jq '.Content | length' <<<"${INVENTORY_DATA}")"
