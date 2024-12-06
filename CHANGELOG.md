@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [unreleased]: https://github.com/bottlerocket-os/twoliter/compare/v0.5.2...HEAD
 
-## [0.6.0] - 2024-12-04
+## [0.6.0] - 2024-12-05
 
 ### Changed
 
