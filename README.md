@@ -37,8 +37,11 @@ The process of testing changes to Twoliter in Bottlerocket is as follows:
 - Commit your changes. This can be either a local commit or a commit on a git fork.
 - In the Bottlerocket git repo
   - Remove the existing Twoliter binary if it exists.
+  - Ensure the [nightly rust toolchain] is installed and enabled.
   - Run any/all `cargo make` commands with the following environment
     variables.
+
+[nightly rust toolchain]: https://rust-lang.github.io/rustup/concepts/channels.html#working-with-nightly-rust
 
 ```sh
 # The URL to the Twoliter git repository. This can be anything that git remote add would accept.
