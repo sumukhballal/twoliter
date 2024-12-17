@@ -8,36 +8,7 @@ use tar::Archive;
 
 const CRANE_VERSION: &str = "0.20.1";
 
-fn apply_source_patches(source_path: impl AsRef<Path>, patch_dir: impl AsRef<Path>) {
-    let source_path = source_path.as_ref();
-    let patch_dir = patch_dir.as_ref();
-
-    which::which("patch").expect("Must have the `patch` utility installed in PATH");
-
-    let mut patches = fs::read_dir(patch_dir)
-        .expect("Failed to read patch directory")
-        .filter_map(|entry| entry.ok())
-        .map(|entry| entry.path())
-        .filter(|path| path.extension().map(|ext| ext == "patch").unwrap_or(false))
-        .collect::<Vec<_>>();
-    patches.sort();
-
-    for patch in patches {
-        println!("Executing `patch -p1 -i '{}'`", patch.display());
-
-        let patch_status = Command::new("patch")
-            .current_dir(source_path)
-            .arg("-p1")
-            .arg("-i")
-            .arg(patch.as_os_str())
-            .status()
-            .expect("Failed to execute patch command");
-
-        if !patch_status.success() {
-            panic!("Failed to apply patch '{}'", patch.display());
-        }
-    }
-}
+const REQUIRED_TOOLS: &[&str] = &["patch", "go"];
 
 fn main() {
     let script_dir = env::current_dir().unwrap();
@@ -46,6 +17,8 @@ fn main() {
     println!("cargo::rerun-if-changed=../build-cache-fetch");
     println!("cargo::rerun-if-changed=hashes/crane");
     println!("cargo::rerun-if-changed=patches");
+
+    ensure_required_tools_installed();
 
     // Download and checksum-verify crane
     env::set_current_dir(&out_dir).expect("Failed to set current directory");
@@ -106,6 +79,42 @@ fn main() {
         .expect("Failed to finish writing compressed krane binary");
 
     println!("cargo::rustc-env=KRANE_GZ_PATH={}", krane_gz_path.display());
+}
+
+fn ensure_required_tools_installed() {
+    for tool in REQUIRED_TOOLS {
+        which::which(tool)
+            .unwrap_or_else(|_| panic!("Must have the `{tool}` utility installed in PATH"));
+    }
+}
+
+fn apply_source_patches(source_path: impl AsRef<Path>, patch_dir: impl AsRef<Path>) {
+    let source_path = source_path.as_ref();
+    let patch_dir = patch_dir.as_ref();
+
+    let mut patches = fs::read_dir(patch_dir)
+        .expect("Failed to read patch directory")
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().map(|ext| ext == "patch").unwrap_or(false))
+        .collect::<Vec<_>>();
+    patches.sort();
+
+    for patch in patches {
+        println!("Executing `patch -p1 -i '{}'`", patch.display());
+
+        let patch_status = Command::new("patch")
+            .current_dir(source_path)
+            .arg("-p1")
+            .arg("-i")
+            .arg(patch.as_os_str())
+            .status()
+            .expect("Failed to execute patch command");
+
+        if !patch_status.success() {
+            panic!("Failed to apply patch '{}'", patch.display());
+        }
+    }
 }
 
 fn get_goos() -> &'static str {
