@@ -3,6 +3,7 @@
 use anyhow::{ensure, Result};
 use lazy_static::lazy_static;
 use semver::{Comparator, Op, Prerelease, VersionReq};
+use tracing::warn;
 use which::which_global;
 
 use crate::docker::Docker;
@@ -28,9 +29,13 @@ lazy_static! {
 /// Runs all common setup required for twoliter.
 ///
 /// * Ensures that any required system tools are installed an accessible.
-/// * Sets up interrupt handler to cleanup on SIGINT
+/// * Sets up signal handler to cleanup on SIGINT
 pub(crate) async fn preflight() -> Result<()> {
     check_environment().await?;
+    if let Err(e) = crate::cleanup::JANITOR.setup_signal_handler() {
+        warn!("Failed to register cleanup signal handler: {:?}", e);
+        warn!("Twoliter may leak resources if interrupted abruptly.");
+    }
 
     Ok(())
 }
