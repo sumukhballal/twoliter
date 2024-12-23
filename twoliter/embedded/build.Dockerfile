@@ -1,4 +1,8 @@
-# syntax=docker/dockerfile:1.4.3
+# Twoliter requires minimum Docker version 23.0.0, which ships with a bundled syntax image 1.4.3
+# We refrain from an explicit `syntax` directive as this can lead to unwanted network requests at
+# build time.
+# See https://hub.docker.com/r/docker/dockerfile for more information
+
 # This Dockerfile has three sections which are used to build rpm.spec packages, to create
 # kits, and to create Bottlerocket images, respectively. They are marked as Sections 1-3.
 # buildsys uses Section 1 during build-package calls, Section 2 during build-kit calls,

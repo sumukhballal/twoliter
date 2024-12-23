@@ -3,10 +3,12 @@ use anyhow::Result;
 use clap::Parser;
 
 mod cargo_make;
+pub(crate) mod cleanup;
 mod cmd;
 mod common;
 mod compatibility;
 mod docker;
+mod preflight;
 mod project;
 mod schema_version;
 /// Test code that should only be compiled when running tests.
@@ -20,5 +22,6 @@ mod tools;
 async fn main() -> Result<()> {
     let args = Args::parse();
     init_logger(args.log_level);
+    preflight::preflight().await?;
     cmd::run(args).await
 }
