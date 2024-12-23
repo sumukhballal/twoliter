@@ -43,7 +43,7 @@ which.workspace = true
 # Binary dependencies. These are binaries that we want to embed in the Twoliter binary
 buildsys = { workspace = true }
 pipesys = { workspace = true }
-pubsys = { workspace = true }
+pubsys = { workspace = true, optional = true }
 pubsys-setup = { workspace = true }
 testsys = { workspace = true }
 tuftool = { workspace = true }
@@ -58,5 +58,6 @@ tar.workspace = true
 test-case.workspace = true
 
 [features]
-default = ["integ-tests"]
+default = ["integ-tests", "pubsys"]
 integ-tests = []
+pubsys = ["dep:pubsys"]

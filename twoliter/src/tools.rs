@@ -12,6 +12,7 @@ use tracing::debug;
 const TAR_GZ_DATA: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/tools.tar.gz"));
 const BUILDSYS: &[u8] = include_bytes!(env!("CARGO_BIN_FILE_BUILDSYS"));
 const PIPESYS: &[u8] = include_bytes!(env!("CARGO_BIN_FILE_PIPESYS"));
+#[cfg(feature = "pubsys")]
 const PUBSYS: &[u8] = include_bytes!(env!("CARGO_BIN_FILE_PUBSYS"));
 const PUBSYS_SETUP: &[u8] = include_bytes!(env!("CARGO_BIN_FILE_PUBSYS_SETUP"));
 const TESTSYS: &[u8] = include_bytes!(env!("CARGO_BIN_FILE_TESTSYS"));
@@ -44,6 +45,7 @@ pub(crate) async fn install_tools(tools_dir: impl AsRef<Path>) -> Result<()> {
 
     write_bin("buildsys", BUILDSYS, &dir, mtime).await?;
     write_bin("pipesys", PIPESYS, &dir, mtime).await?;
+    #[cfg(feature = "pubsys")]
     write_bin("pubsys", PUBSYS, &dir, mtime).await?;
     write_bin("pubsys-setup", PUBSYS_SETUP, &dir, mtime).await?;
     write_bin("testsys", TESTSYS, &dir, mtime).await?;
