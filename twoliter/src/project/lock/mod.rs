@@ -13,12 +13,13 @@ mod verification;
 mod views;
 
 pub(crate) use self::verification::VerificationTagger;
+pub(crate) use image::LockedImage;
 
 use crate::common::fs::{create_dir_all, read, write};
 use crate::project::{Project, ValidIdentifier};
 use crate::schema_version::SchemaVersion;
 use anyhow::{bail, ensure, Context, Result};
-use image::{ImageResolver, LockedImage};
+use image::ImageResolver;
 use oci_cli_wrapper::ImageTool;
 use olpc_cjson::CanonicalFormatter as CanonicalJsonFormatter;
 use semver::Version;
