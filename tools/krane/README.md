@@ -1,10 +1,8 @@
-## krane-bundle
+## krane-static
 
 This crate packages the `krane` utility from [google/go-containerregistry].
 
-The utility is compiled by a build script, the output of which is compressed and stored in the Rust
-crate as via `include_bytes!`.
-At runtime, `krane-bundle` writes the decompressed binary to a temp file, passing the
-filepath of that file to any caller.
+The program is replicated as static library exposed via C FFI.
+Rust bindings are provided which imitate `std::process::Command::output`.
 
 [google/go-containerregistry]: https://github.com/google/go-containerregistry

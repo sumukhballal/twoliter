@@ -31,7 +31,7 @@ pub(crate) struct PublishKitArgs {
 }
 
 pub(crate) async fn run(args: &Args, publish_kit_args: &PublishKitArgs) -> Result<()> {
-    let image_tool = ImageTool::from_builtin_krane();
+    let image_tool = ImageTool::krane();
 
     // If a lock file exists, use that, otherwise use Infra.toml
     let infra_config = InfraConfig::from_path_or_lock(&args.infra_config_path, false)

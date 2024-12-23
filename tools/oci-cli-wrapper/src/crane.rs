@@ -1,19 +1,17 @@
+use std::fmt::Debug;
 use std::fs::File;
 use std::path::Path;
 
 use async_trait::async_trait;
-use snafu::ResultExt;
+use krane_static::{call_krane, call_krane_inherited_io};
+use snafu::{ensure, ResultExt};
 use tar::Archive as TarArchive;
 use tempfile::TempDir;
 
-use crate::{
-    cli::CommandLine, error, ConfigView, DockerArchitecture, ImageToolImpl, ImageView, Result,
-};
+use crate::{error, ConfigView, DockerArchitecture, ImageToolImpl, ImageView, Result};
 
 #[derive(Debug)]
-pub struct CraneCLI {
-    pub(crate) cli: CommandLine,
-}
+pub struct CraneCLI;
 
 impl CraneCLI {
     /// Enables verbose logging of crane if debug logging is enabled.
@@ -24,38 +22,107 @@ impl CraneCLI {
             cmd.into()
         }
     }
+
+    fn debug_cmd(args: &[&str]) -> String {
+        [
+            vec!["krane".to_string()],
+            args.iter()
+                .map(|arg| format!("'{}'", arg))
+                .collect::<Vec<_>>(),
+        ]
+        .concat()
+        .join(", ")
+    }
+
+    /// Calls `krane` with the given arguments.
+    ///
+    /// Returns stdout if the process successfully completes.
+    async fn output(cmd: &[&str], error_msg: &str) -> Result<Vec<u8>> {
+        let args = Self::crane_cmd(cmd);
+
+        log::debug!("Executing [{}]", Self::debug_cmd(cmd));
+
+        let fork_args = args.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let output = tokio::task::spawn_blocking(move || call_krane(&fork_args))
+            .await
+            .context(error::ForkSnafu)?
+            .context(error::CraneFFISnafu)?;
+
+        log::debug!(
+            "[{}] stdout: {}",
+            Self::debug_cmd(&args),
+            String::from_utf8_lossy(&output.stdout).to_string()
+        );
+        log::debug!(
+            "[{}] stderr: {}",
+            Self::debug_cmd(&args),
+            String::from_utf8_lossy(&output.stderr).to_string()
+        );
+
+        ensure!(
+            output.status.success(),
+            error::OperationFailedSnafu {
+                message: error_msg,
+                program: "krane",
+                args: args.iter().map(|x| x.to_string()).collect::<Vec<_>>()
+            }
+        );
+
+        Ok(output.stdout)
+    }
+
+    /// Calls `krane` with the given arguments.
+    ///
+    /// stdout/stderr is inherited from the current process.
+    async fn call(cmd: &[&str], error_msg: &str) -> Result<()> {
+        let args = Self::crane_cmd(cmd);
+
+        log::debug!("Executing [{}]", Self::debug_cmd(cmd));
+
+        let fork_args = args.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        let status = tokio::task::spawn_blocking(move || call_krane_inherited_io(&fork_args))
+            .await
+            .context(error::ForkSnafu)?
+            .context(error::CraneFFISnafu)?;
+
+        ensure!(
+            status.success(),
+            error::OperationFailedSnafu {
+                message: error_msg,
+                program: "krane",
+                args: args.iter().map(|x| x.to_string()).collect::<Vec<_>>()
+            }
+        );
+
+        Ok(())
+    }
 }
 
 #[async_trait]
 impl ImageToolImpl for CraneCLI {
     async fn pull_oci_image(&self, path: &Path, uri: &str) -> Result<()> {
         let archive_path = path.to_string_lossy();
-        self.cli
-            .spawn(
-                &Self::crane_cmd(&["pull", "--format", "oci", uri, archive_path.as_ref()]),
-                format!("failed to pull image archive from {}", uri),
-            )
-            .await?;
-        Ok(())
+        Self::call(
+            &["pull", "--format", "oci", uri, archive_path.as_ref()],
+            &format!("failed to pull image archive from {}", uri),
+        )
+        .await
     }
 
     async fn get_manifest(&self, uri: &str) -> Result<Vec<u8>> {
-        self.cli
-            .output(
-                &Self::crane_cmd(&["manifest", uri]),
-                format!("failed to fetch manifest for resource at {}", uri),
-            )
-            .await
+        Self::output(
+            &["manifest", uri],
+            &format!("failed to fetch manifest for resource at {}", uri),
+        )
+        .await
     }
 
     async fn get_config(&self, uri: &str) -> Result<ConfigView> {
-        let bytes = self
-            .cli
-            .output(
-                &Self::crane_cmd(&["config", uri]),
-                format!("failed to fetch image config from {}", uri),
-            )
-            .await?;
+        let bytes = Self::output(
+            &["config", uri],
+            &format!("failed to fetch image config from {}", uri),
+        )
+        .await?;
         let image_view: ImageView =
             serde_json::from_slice(bytes.as_slice()).context(error::ConfigDeserializeSnafu)?;
         Ok(image_view.config)
@@ -70,12 +137,11 @@ impl ImageToolImpl for CraneCLI {
         oci_archive
             .unpack(temp_dir.path())
             .context(error::ArchiveExtractSnafu)?;
-        self.cli
-            .spawn(
-                &Self::crane_cmd(&["push", &temp_dir.path().to_string_lossy(), uri]),
-                format!("failed to push image {}", uri),
-            )
-            .await
+        Self::call(
+            &["push", &temp_dir.path().to_string_lossy(), uri],
+            &format!("failed to push image {}", uri),
+        )
+        .await
     }
 
     async fn push_multi_platform_manifest(
@@ -93,13 +159,10 @@ impl ImageToolImpl for CraneCLI {
             manifest_create_args.extend_from_slice(&["-m", image])
         }
         manifest_create_args.extend_from_slice(&["-t", uri]);
-        self.cli
-            .output(
-                &Self::crane_cmd(&manifest_create_args),
-                format!("could not push multi-platform manifest to {}", uri),
-            )
-            .await?;
-
-        Ok(())
+        Self::call(
+            &manifest_create_args,
+            &format!("could not push multi-platform manifest to {}", uri),
+        )
+        .await
     }
 }
