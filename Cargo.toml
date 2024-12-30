@@ -38,8 +38,8 @@ targets = ["x86_64-unknown-linux-musl", "aarch64-unknown-linux-musl"]
 
 [workspace.metadata.cross.build]
 pre-build = [
-    # install golang and patch for krane-bundle
-    "apt update && apt --assume-yes install golang-1.22 patch",
+    # install golang and patch for krane-static
+    "apt update && apt --assume-yes install golang-1.22",
     "update-alternatives --install /usr/bin/go go /usr/lib/go-1.22/bin/go 10",
     # give the builder access to the go build and module caches
     "mkdir /.cache && chmod a+rw /.cache",
@@ -51,7 +51,7 @@ bottlerocket-types = { version = "0.0.14", git = "https://github.com/bottlerocke
 bottlerocket-variant = { version = "0.1", path = "tools/bottlerocket-variant" }
 buildsys = { version = "0.1", path = "tools/buildsys", lib = true, artifact = [ "bin:buildsys" ] }
 buildsys-config = { version = "0.1", path = "tools/buildsys-config" }
-krane-bundle = { version = "0.1", path = "tools/krane" }
+krane-static = { version = "0.1", path = "tools/krane" }
 oci-cli-wrapper = { version = "0.1", path = "tools/oci-cli-wrapper" }
 parse-datetime = { version = "0.1", path = "tools/parse-datetime" }
 pipesys = { version = "0.1", path = "tools/pipesys", lib = true, artifact = [ "bin:pipesys" ] }
@@ -84,6 +84,7 @@ bytes = "1"
 chrono = { version = "0.4", default-features = false }
 clap = "4"
 coldsnap = { version = "0.6", default-features = false }
+ctrlc = "3"
 daemonize = "0.5"
 duct = "0.13"
 env_logger = "0.11"
@@ -124,6 +125,7 @@ tabled = "0.10"
 tar = "0.4"
 tempfile = "3"
 term_size = "0.3"
+test-case = "3"
 tinytemplate = "1"
 tokio = "1"
 tokio-stream = "0.1"

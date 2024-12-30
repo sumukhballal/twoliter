@@ -1068,6 +1068,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ctrlc"
+version = "3.4.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "672465ae37dc1bc6380a6547a8883d5dd397b0f1faaad4f265726cc7042a5345"
+dependencies = [
+ "nix",
+ "windows-sys 0.52.0",
+]
+
+[[package]]
 name = "daemonize"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1896,14 +1906,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "krane-bundle"
+name = "krane-static"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "flate2",
- "lazy_static",
- "tar",
- "tempfile",
+ "libc",
  "which",
 ]
 
@@ -2165,7 +2172,7 @@ name = "oci-cli-wrapper"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "krane-bundle",
+ "krane-static",
  "log",
  "olpc-cjson",
  "regex",
@@ -3362,6 +3369,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "test-case"
+version = "3.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "eb2550dd13afcd286853192af8601920d959b14c401fcece38071d53bf0768a8"
+dependencies = [
+ "test-case-macros",
+]
+
+[[package]]
+name = "test-case-core"
+version = "3.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "adcb7fd841cd518e279be3d5a3eb0636409487998a4aff22f3de87b81e88384f"
+dependencies = [
+ "cfg-if",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.79",
+]
+
+[[package]]
+name = "test-case-macros"
+version = "3.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c89e72a01ed4c579669add59014b9a524d609c0c88c6a585ce37485879f6ffb"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.79",
+ "test-case-core",
+]
+
+[[package]]
 name = "testsys"
 version = "0.1.0"
 dependencies = [
@@ -3868,11 +3908,13 @@ dependencies = [
  "buildsys-config",
  "bytes",
  "clap",
+ "ctrlc",
  "env_logger",
  "filetime",
  "flate2",
  "futures",
- "krane-bundle",
+ "krane-static",
+ "lazy_static",
  "log",
  "oci-cli-wrapper",
  "olpc-cjson",
@@ -3886,6 +3928,7 @@ dependencies = [
  "strum",
  "tar",
  "tempfile",
+ "test-case",
  "testsys",
  "tokio",
  "toml",
@@ -3893,6 +3936,7 @@ dependencies = [
  "tuftool",
  "unplug",
  "uuid",
+ "which",
 ]
 
 [[package]]
@@ -4198,7 +4242,7 @@ version = "0.1.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cf221c93e13a30d793f7645a0e7762c55d169dbb0a49671918a2319d289b10bb"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

@@ -17,11 +17,13 @@ async-trait.workspace = true
 base64.workspace = true
 buildsys-config.workspace = true
 clap = { workspace = true, features = ["derive", "env", "std"] }
+ctrlc = { workspace = true, features = ["termination"] }
 env_logger.workspace = true
 filetime.workspace = true
 flate2.workspace = true
 futures.workspace = true
-krane-bundle.workspace = true
+krane-static.workspace = true
+lazy_static.workspace = true
 log.workspace = true
 oci-cli-wrapper.workspace = true
 olpc-cjson.workspace = true
@@ -36,11 +38,12 @@ tokio = { workspace = true, features = ["fs", "macros", "process", "rt-multi-thr
 toml.workspace = true
 tracing = { workspace = true, features = ["log"] }
 uuid = { workspace = true, features = ["v4"] }
+which.workspace = true
 
 # Binary dependencies. These are binaries that we want to embed in the Twoliter binary
 buildsys = { workspace = true }
 pipesys = { workspace = true }
-pubsys = { workspace = true }
+pubsys = { workspace = true, optional = true }
 pubsys-setup = { workspace = true }
 testsys = { workspace = true }
 tuftool = { workspace = true }
@@ -51,6 +54,10 @@ bytes.workspace = true
 flate2.workspace = true
 tar.workspace = true
 
+[dev-dependencies]
+test-case.workspace = true
+
 [features]
-default = ["integ-tests"]
+default = ["integ-tests", "pubsys"]
 integ-tests = []
+pubsys = ["dep:pubsys"]

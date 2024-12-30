@@ -40,6 +40,7 @@ impl PublishKit {
     pub(super) async fn run(&self) -> Result<()> {
         let project = project::load_or_find_project(self.project_path.clone()).await?;
         let project = project.load_lock::<Locked>().await?;
+
         let toolsdir = project.project_dir().join("build/tools");
         install_tools(&toolsdir).await?;
         let makefile_path = toolsdir.join("Makefile.toml");
@@ -48,6 +49,7 @@ impl PublishKit {
             Some(kit_repo) => kit_repo,
             None => &self.kit_name,
         };
+        project.fetch_sdk().await?;
         CargoMake::new(project.sdk_image().project_image_uri().to_string().as_str())?
             .env("TWOLITER_TOOLS_DIR", toolsdir.display().to_string())
             .env("BUILDSYS_KIT", &self.kit_name)

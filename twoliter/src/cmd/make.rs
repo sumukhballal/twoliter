@@ -54,7 +54,19 @@ pub(crate) struct Make {
 impl Make {
     pub(super) async fn run(&self) -> Result<()> {
         let project = project::load_or_find_project(self.project_path.clone()).await?;
-        let sdk_source = self.locked_sdk(&project).await?;
+
+        let sdk_source = if self.can_skip_kit_verification(&project) {
+            let project = project.load_lock::<SDKLocked>().await?;
+            project.fetch_sdk().await?;
+            project.sdk_image()
+        } else {
+            let project = project.load_lock::<Locked>().await?;
+            project.fetch_sdk().await?;
+            project.sdk_image()
+        }
+        .project_image_uri()
+        .to_string();
+
         let toolsdir = project.project_dir().join("build/tools");
         install_tools(&toolsdir).await?;
         let makefile_path = toolsdir.join("Makefile.toml");
@@ -74,17 +86,6 @@ impl Make {
         let project_has_explicit_sdk_dep = project.direct_sdk_image_dep().is_some();
 
         target_allows_kit_verification_skip && project_has_explicit_sdk_dep
-    }
-
-    /// Returns the locked SDK image for the project.
-    async fn locked_sdk(&self, project: &project::Project<Unlocked>) -> Result<String> {
-        Ok(if self.can_skip_kit_verification(project) {
-            project.load_lock::<SDKLocked>().await?.sdk_image()
-        } else {
-            project.load_lock::<Locked>().await?.sdk_image()
-        }
-        .project_image_uri()
-        .to_string())
     }
 }
 
@@ -227,6 +228,7 @@ mod test {
         install_tools(&toolsdir).await.unwrap();
         let makefile_path = toolsdir.join("Makefile.toml");
 
+        project.fetch_sdk().await?;
         CargoMake::new(&sdk_source)
             .unwrap()
             .env("CARGO_HOME", project_dir.display().to_string())
@@ -264,24 +266,6 @@ mod test {
     #[tokio::test]
     async fn test_build_variant_cannot_skip_kit_verification() {
         assert!(!target_can_skip_kit_verification("build-variant").await);
-    }
-
-    #[tokio::test]
-    #[ignore] // integration test
-    async fn test_fetch_sdk_succeeds_when_only_sdk_verified() {
-        let temp_dir = crate::test::copy_project_to_temp_dir(PROJECT);
-        assert!(run_makefile_target("fetch-sdk", &temp_dir.path(), false)
-            .await
-            .is_ok());
-    }
-
-    #[tokio::test]
-    #[ignore] // integration test
-    async fn test_fetch_sdk_fails_when_nothing_verified() {
-        let temp_dir = crate::test::copy_project_to_temp_dir(PROJECT);
-        assert!(run_makefile_target("fetch-sdk", &temp_dir.path(), true)
-            .await
-            .is_err());
     }
 
     #[tokio::test]

@@ -18,7 +18,8 @@ impl Fetch {
     pub(super) async fn run(&self) -> Result<()> {
         let project = project::load_or_find_project(self.project_path.clone()).await?;
         let project = project.load_lock::<Locked>().await?;
-        project.fetch(self.arch.as_str()).await?;
+        project.fetch_kits(self.arch.as_str()).await?;
+        project.fetch_sdk().await?;
         Ok(())
     }
 }

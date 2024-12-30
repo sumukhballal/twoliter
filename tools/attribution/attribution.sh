@@ -26,23 +26,20 @@ echo "Clarifying crate dependency licenses..."
     cargo --locked Cargo.toml
 
 # =^.^=  =^.^=  =^.^=  =^.^=  =^.^=  =^.^=  =^.^=  =^.^=  =^.^=  =^.^=  =^.^=  =^.^=  =^.^=  =^.^=
-# go-containerregistry
-pushd /src/tools/krane
-../build-cache-fetch hashes/crane
-TARBALL=$(grep -oP '\(\K[^\)]*' hashes/crane)
-GO_CONTAINERREGISTRY_UNPACK_DIR=$(mktemp -d)
-tar --strip-components=1 -xvf "${TARBALL}" -C "${GO_CONTAINERREGISTRY_UNPACK_DIR}"
+# krane-static
+echo "Clarifying golang dependencies of krane-static"
+KRANE_STATIC_VENDOR_DIR=$(mktemp -d)
+cp -r /src/tools/krane/go-src/* "${KRANE_STATIC_VENDOR_DIR}"
 
-pushd "${GO_CONTAINERREGISTRY_UNPACK_DIR}/cmd/krane"
+pushd "${KRANE_STATIC_VENDOR_DIR}"
 go mod vendor
 popd
 
 /usr/libexec/tools/bottlerocket-license-scan \
     --clarify /src/clarify.toml \
     --spdx-data /usr/libexec/tools/spdx-data \
-    --out-dir ${LICENSEDIR}/krane \
-    go-vendor "${GO_CONTAINERREGISTRY_UNPACK_DIR}/cmd/krane/vendor"
-popd
+    --out-dir ${LICENSEDIR}/krane-static \
+    go-vendor "${KRANE_STATIC_VENDOR_DIR}/vendor"
 
 # =^.^=  =^.^=  =^.^=  =^.^=  =^.^=  =^.^=  =^.^=  =^.^=  =^.^=  =^.^=  =^.^=  =^.^=  =^.^=  =^.^=
 # cargo-make (we currently use cargo-make from the SDK, but will ship it in Twoliter in the future)

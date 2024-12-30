@@ -63,6 +63,7 @@ impl BuildKit {
             optional_envs.push(("BUILDSYS_LOOKASIDE_CACHE", lookaside_cache))
         }
 
+        project.fetch_sdk().await?;
         CargoMake::new(&project.sdk_image().project_image_uri().to_string())?
             .env("TWOLITER_TOOLS_DIR", toolsdir.display().to_string())
             .env("BUILDSYS_ARCH", &self.arch)
@@ -135,6 +136,7 @@ impl BuildVariant {
             ))
         }
 
+        project.fetch_sdk().await?;
         CargoMake::new(&project.sdk_image().project_image_uri().to_string())?
             .env("TWOLITER_TOOLS_DIR", toolsdir.display().to_string())
             .env("BUILDSYS_ARCH", &self.arch)

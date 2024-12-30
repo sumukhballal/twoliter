@@ -1,13 +1,16 @@
+mod image;
 mod lock;
+pub(crate) mod tasks;
 pub(crate) mod vendor;
 
+pub(crate) use self::image::{Image, ProjectImage, ValidIdentifier, VendedArtifact, Vendor};
 pub(crate) use self::vendor::ArtifactVendor;
+use lock::LockedImage;
 pub(crate) use lock::VerificationTagger;
 
 use self::lock::{Lock, LockedSDK, Override};
 use crate::common::fs::{self, read_to_string};
 use crate::compatibility::SUPPORTED_TWOLITER_PROJECT_SCHEMA_VERSION;
-use crate::docker::ImageUri;
 use crate::schema_version::SchemaVersion;
 use anyhow::{ensure, Context, Result};
 use async_recursion::async_recursion;
@@ -15,15 +18,11 @@ use async_trait::async_trait;
 use async_walkdir::WalkDir;
 use buildsys_config::{EXTERNAL_KIT_DIRECTORY, EXTERNAL_KIT_METADATA};
 use futures::stream::StreamExt;
-use semver::Version;
-use serde::de::Error;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::ffi::OsStr;
-use std::fmt::{Debug, Display, Formatter};
-use std::hash::Hash;
+use std::fmt::Debug;
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 use toml::Table;
 use tracing::{debug, info, instrument, trace, warn};
 
@@ -174,6 +173,10 @@ impl<L: ProjectLock> Project<L> {
         self.project_dir.join(EXTERNAL_KIT_METADATA)
     }
 
+    pub(crate) fn external_sdk_archive_dir(&self) -> PathBuf {
+        self.project_dir.join("build/external-sdk-archives")
+    }
+
     pub(crate) fn schema_version(&self) -> SchemaVersion<1> {
         self.schema_version
     }
@@ -274,17 +277,16 @@ impl<L: ProjectLock> Project<L> {
     }
 }
 
-impl Project<SDKLocked> {
+impl<T: LockedSDKProvider> Project<T> {
     pub(crate) fn sdk_image(&self) -> ProjectImage {
-        let SDKLocked(lock) = &self.lock;
-        self.as_project_image(&lock.0)
+        self.as_project_image(self.lock.locked_sdk_image())
             .expect("Could not find SDK vendor despite lock resolution succeeding?")
     }
 }
 
 impl Project<Locked> {
     /// Fetches all external kits defined in a Twoliter.lock to the build directory
-    pub(crate) async fn fetch(&self, arch: &str) -> Result<()> {
+    pub(crate) async fn fetch_kits(&self, arch: &str) -> Result<()> {
         let Locked(lock) = &self.lock;
         lock.fetch(self, arch).await
     }
@@ -297,197 +299,6 @@ impl Project<Locked> {
             .map(|kit| self.as_project_image(kit))
             .collect::<Result<_>>()
             .expect("Could not find kit vendor despite lock resolution succeeding?")
-    }
-
-    pub(crate) fn sdk_image(&self) -> ProjectImage {
-        let Locked(lock) = &self.lock;
-        self.as_project_image(&lock.sdk)
-            .expect("Could not find SDK vendor despite lock resolution succeeding?")
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub(crate) struct ProjectImage {
-    image: Image,
-    vendor: ArtifactVendor,
-}
-
-impl Display for ProjectImage {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self.vendor {
-            ArtifactVendor::Overridden(_) => write!(
-                f,
-                "{}-{}@{} (overridden-to: {})",
-                self.name(),
-                self.version(),
-                self.original_source_uri(),
-                self.project_image_uri(),
-            ),
-            ArtifactVendor::Verbatim(_) => write!(
-                f,
-                "{}-{}@{}",
-                self.name(),
-                self.version(),
-                self.original_source_uri()
-            ),
-        }
-    }
-}
-
-impl ProjectImage {
-    pub(crate) fn name(&self) -> &ValidIdentifier {
-        &self.image.name
-    }
-
-    pub(crate) fn version(&self) -> &Version {
-        self.image.version()
-    }
-
-    pub(crate) fn vendor_name(&self) -> &ValidIdentifier {
-        self.vendor.vendor_name()
-    }
-
-    /// Returns the URI for the original vendor.
-    pub(crate) fn original_source_uri(&self) -> ImageUri {
-        match &self.vendor {
-            ArtifactVendor::Overridden(overridden) => {
-                let original = ArtifactVendor::Verbatim(overridden.original_vendor());
-                original.image_uri_for(&self.image)
-            }
-            ArtifactVendor::Verbatim(_) => self.vendor.image_uri_for(&self.image),
-        }
-    }
-
-    /// Returns the image URI that the project will use for this image
-    ///
-    /// This could be different than the source_uri if overridden.
-    pub(crate) fn project_image_uri(&self) -> ImageUri {
-        ImageUri {
-            registry: Some(self.vendor.registry().to_string()),
-            repo: self.vendor.repo_for(&self.image).to_string(),
-            tag: format!("v{}", self.image.version()),
-        }
-    }
-}
-
-/// An artifact/vendor name combination used to identify an artifact resolved by Twoliter.
-///
-/// This is intended for use in [`Project::vendor_for`] lookups.
-pub(crate) trait VendedArtifact: std::fmt::Debug {
-    fn artifact_name(&self) -> &ValidIdentifier;
-    fn vendor_name(&self) -> &ValidIdentifier;
-    fn version(&self) -> &Version;
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub(crate) struct ValidIdentifier(pub(crate) String);
-
-impl Serialize for ValidIdentifier {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        serializer.serialize_str(self.0.as_str())
-    }
-}
-
-impl FromStr for ValidIdentifier {
-    type Err = anyhow::Error;
-
-    fn from_str(input: &str) -> Result<Self, Self::Err> {
-        ensure!(
-            !input.is_empty(),
-            "cannot define an identifier as an empty string",
-        );
-
-        // Check if the input contains any invalid characters
-        for c in input.chars() {
-            ensure!(
-                is_valid_id_char(c),
-                "invalid character '{}' found in identifier name",
-                c
-            );
-        }
-
-        Ok(Self(input.to_string()))
-    }
-}
-
-impl<'de> Deserialize<'de> for ValidIdentifier {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let input = String::deserialize(deserializer)?;
-        input.parse().map_err(D::Error::custom)
-    }
-}
-
-impl AsRef<str> for ValidIdentifier {
-    fn as_ref(&self) -> &str {
-        self.0.as_str()
-    }
-}
-
-impl Display for ValidIdentifier {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.0.as_str())
-    }
-}
-
-fn is_valid_id_char(c: char) -> bool {
-    match c {
-        // Allow alphanumeric characters, underscores, and hyphens
-        'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' => true,
-        // Disallow other characters
-        _ => false,
-    }
-}
-
-/// This represents a container registry vendor that is used in resolving the kits and also
-/// now the bottlerocket sdk
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[serde(rename_all = "kebab-case")]
-pub(crate) struct Vendor {
-    pub registry: String,
-}
-
-/// This represents a dependency on a container, primarily used for kits
-#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[serde(rename_all = "kebab-case")]
-pub(crate) struct Image {
-    pub name: ValidIdentifier,
-    pub version: Version,
-    pub vendor: ValidIdentifier,
-}
-
-impl Image {
-    fn from_vended_artifact(artifact: &impl VendedArtifact) -> Self {
-        Self {
-            name: artifact.artifact_name().clone(),
-            vendor: artifact.vendor_name().clone(),
-            version: artifact.version().clone(),
-        }
-    }
-}
-
-impl Display for Image {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}-{}@{}", self.name, self.version, self.vendor)
-    }
-}
-
-impl VendedArtifact for Image {
-    fn artifact_name(&self) -> &ValidIdentifier {
-        &self.name
-    }
-
-    fn vendor_name(&self) -> &ValidIdentifier {
-        &self.vendor
-    }
-
-    fn version(&self) -> &Version {
-        &self.version
     }
 }
 
@@ -687,6 +498,25 @@ impl From<Lock> for Locked {
     }
 }
 
+/// A trait representing Projects which have verified their locked SDK.
+pub(crate) trait LockedSDKProvider: ProjectLock {
+    fn locked_sdk_image(&self) -> &LockedImage;
+}
+
+impl LockedSDKProvider for SDKLocked {
+    fn locked_sdk_image(&self) -> &LockedImage {
+        let SDKLocked(lock) = self;
+        &lock.0
+    }
+}
+
+impl LockedSDKProvider for Locked {
+    fn locked_sdk_image(&self) -> &LockedImage {
+        let Locked(lock) = self;
+        &lock.sdk
+    }
+}
+
 /// Seal the `ProjectLock` trait -- only this module is allowed to define new lock types.
 mod private {
     /// A marker type that, when used in a method signature, makes it impossible for other modules
@@ -698,7 +528,9 @@ mod private {
 mod test {
     use super::*;
     use crate::common::fs;
+    use crate::docker::ImageUri;
     use crate::test::{data_dir, projects_dir};
+    use semver::Version;
     use tempfile::TempDir;
 
     /// Ensure that `Twoliter.toml` can be deserialized.
