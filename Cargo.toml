@@ -54,6 +54,7 @@ buildsys-config = { version = "0.1", path = "tools/buildsys-config" }
 krane-static = { version = "0.1", path = "tools/krane" }
 oci-cli-wrapper = { version = "0.1", path = "tools/oci-cli-wrapper" }
 parse-datetime = { version = "0.1", path = "tools/parse-datetime" }
+path-absolutize = "3.1"
 pipesys = { version = "0.1", path = "tools/pipesys", lib = true, artifact = [ "bin:pipesys" ] }
 pubsys = { version = "0.1", path = "tools/pubsys", artifact = [ "bin:pubsys" ] }
 pubsys-config = { version = "0.1", path = "tools/pubsys-config" }
@@ -147,3 +148,6 @@ which = "6"
 [profile.dist]
 inherits = "release"
 lto = "thin"
+
+[workspace.lints.clippy]
+disallowed-methods = "deny"

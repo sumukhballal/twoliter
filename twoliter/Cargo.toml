@@ -27,6 +27,7 @@ lazy_static.workspace = true
 log.workspace = true
 oci-cli-wrapper.workspace = true
 olpc-cjson.workspace = true
+path-absolutize.workspace = true
 semver = { workspace = true, features = ["serde"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
@@ -61,3 +62,6 @@ test-case.workspace = true
 default = ["integ-tests", "pubsys"]
 integ-tests = []
 pubsys = ["dep:pubsys"]
+
+[lints]
+workspace = true
