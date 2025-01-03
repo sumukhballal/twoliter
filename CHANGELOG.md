@@ -7,7 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-[unreleased]: https://github.com/bottlerocket-os/twoliter/compare/v0.5.2...HEAD
+[unreleased]: https://github.com/bottlerocket-os/twoliter/compare/v0.7.0...HEAD
+
+## [0.7.0] - 2025-01-03
+
+### Changed
+
+- Require Docker 23 on build host ([#423])
+- Stop requiring a dockerfile syntax image at build time ([#423])
+
+### Fixed
+
+- Prevent leaking tempfiles when executing krane ([#423], [#430])
+- Stop dereferencing symlinks when traversing project directory ([#431])
+
+[#423]: https://github.com/bottlerocket-os/twoliter/pull/423
+[#430]: https://github.com/bottlerocket-os/twoliter/pull/430
+[#431]: https://github.com/bottlerocket-os/twoliter/pull/431
+
+[0.7.0]: https://github.com/bottlerocket-os/twoliter/compare/v0.6.0...v0.7.0
 
 ## [0.6.0] - 2024-12-05
 
