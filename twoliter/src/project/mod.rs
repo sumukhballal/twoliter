@@ -7,6 +7,7 @@ pub(crate) use self::image::{Image, ProjectImage, ValidIdentifier, VendedArtifac
 pub(crate) use self::vendor::ArtifactVendor;
 use lock::LockedImage;
 pub(crate) use lock::VerificationTagger;
+use path_absolutize::Absolutize;
 
 use self::lock::{Lock, LockedSDK, Override};
 use crate::common::fs::{self, read_to_string};
@@ -108,7 +109,7 @@ impl Project<Unlocked> {
             dir.display()
         );
         let dir = dir
-            .canonicalize()
+            .absolutize()
             .context(format!("Unable to canonicalize '{}'", dir.display()))?;
         let filepath = dir.join("Twoliter.toml");
         if filepath.is_file() {

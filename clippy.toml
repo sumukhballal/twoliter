@@ -1,0 +1,12 @@
+[[disallowed-methods]]
+path = "std::path::Path::canonicalize"
+reason = "Twoliter usually does not want to resolve symlinks. Use path_absolutize instead"
+
+[[disallowed-methods]]
+path = "std::fs::canonicalize"
+reason = "Twoliter usually does not want to resolve symlinks. Use path_absolutize instead"
+
+[[disallowed-methods]]
+path = "tokio::fs::canonicalize"
+reason = "Twoliter usually does not want to resolve symlinks. Use path_absolutize instead"
+

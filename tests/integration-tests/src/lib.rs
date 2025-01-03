@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use tempfile::TempDir;
 
+mod twoliter_build;
 mod twoliter_update;
 
 pub const TWOLITER_PATH: &'static str = env!("CARGO_BIN_FILE_TWOLITER");

@@ -72,18 +72,24 @@ pub(crate) async fn exec(cmd: &mut Command, quiet: bool) -> Result<Option<String
 #[allow(dead_code)]
 pub(crate) mod fs {
     use anyhow::{Context, Result};
+    use path_absolutize::Absolutize;
     use std::fs::Metadata;
     use std::io::ErrorKind;
     use std::path::{Path, PathBuf};
     use tokio::fs;
     use tracing::instrument;
 
+    /// Canonicalizes the input path based on `cwd` without resolving symlinks or accessing the
+    /// filesystem.
     #[instrument(level = "trace", skip(path), fields(path = %path.as_ref().display()))]
     pub(crate) async fn canonicalize(path: impl AsRef<Path>) -> Result<PathBuf> {
-        fs::canonicalize(path.as_ref()).await.context(format!(
-            "Unable to canonicalize '{}'",
-            path.as_ref().display()
-        ))
+        path.as_ref()
+            .absolutize()
+            .context(format!(
+                "Unable to canonicalize '{}'",
+                path.as_ref().display()
+            ))
+            .map(|p| p.to_path_buf())
     }
 
     #[instrument(
