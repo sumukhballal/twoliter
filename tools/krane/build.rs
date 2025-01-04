@@ -14,17 +14,26 @@ fn main() {
 
     // build krane FFI wrapper
     let build_output_loc = out_dir.join("libkrane.a");
-    let exit_status = Command::new("go")
+    let mut build_command = Command::new("go");
+
+    build_command
         .env("GOOS", get_goos())
         .env("GOARCH", get_goarch())
+        .env("CGO_ENABLED", "1")
         .arg("build")
         .arg("-buildmode=c-archive")
         .arg("-o")
         .arg(&build_output_loc)
         .arg("main.go")
-        .current_dir(script_dir.join("go-src"))
-        .status()
-        .expect("Failed to build crane");
+        .current_dir(script_dir.join("go-src"));
+
+    // Set cross-compiler when using cargo-cross
+    let cross_cc_var = format!("CC_{}", env::var("TARGET").unwrap().replace("-", "_"));
+    if let Some(cross_cc) = env::var_os(&cross_cc_var) {
+        build_command.env("CC", cross_cc);
+    }
+
+    let exit_status = build_command.status().expect("Failed to build crane");
 
     assert!(
         exit_status.success(),
