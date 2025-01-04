@@ -21,3 +21,30 @@ jobs:
         with:
           go-version: "^1.18"
       - run: make build
+
+  cross-build:
+    runs-on:
+      group: bottlerocket
+      labels: bottlerocket_ubuntu-latest_16-core
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-musl
+          - target: aarch64-unknown-linux-musl
+    env:
+      TARGET_TRIPLE: ${{ matrix.target }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Cross
+        # Pin cargo cross to a version that we know is working for us.
+        run: |
+          cargo install cross --git https://github.com/cross-rs/cross/ --rev 7b79041 --locked
+      - run: |
+          # cargo-cross warns us that multiple cross configurations are present in our
+          # workspace (ie dependencies have configurations), but it picks the appropriate one from
+          # the twoliter workspace.
+          #
+          # These warnings cause the tool to fail, so we disable them.
+          export CROSS_NO_WARNINGS=0
+
+          cross build --release --bin twoliter --target "${TARGET_TRIPLE}"
