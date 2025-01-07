@@ -16,7 +16,7 @@ ARG SDK
 ARG ARCH
 ARG GOARCH
 
-FROM ${SDK} as sdk
+FROM ${SDK} AS sdk
 
 ############################################################################################
 # Section 1: The following build stages are used to build rpm.spec packages
@@ -194,7 +194,7 @@ COPY --from=kitbuild /tmp/.${NOCACHE} /
 
 # =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^=
 # Generate the expected RPM macros and bconds.
-FROM sdk as rpm-macros-and-bconds
+FROM sdk AS rpm-macros-and-bconds
 ARG VARIANT
 ARG VARIANT_PLATFORM
 ARG VARIANT_RUNTIME
@@ -314,7 +314,7 @@ RUN --mount=target=/host \
 
 # =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^=
 # Builds a Bottlerocket image.
-FROM repobuild as imgbuild
+FROM repobuild AS imgbuild
 ARG ARCH
 ARG VERSION_ID
 ARG BUILD_ID
@@ -385,7 +385,7 @@ RUN --mount=target=/host \
 
 # =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^=
 # Creates an archive of the datastore migrations.
-FROM repobuild as migrationbuild
+FROM repobuild AS migrationbuild
 ARG ARCH
 ARG VERSION_ID
 ARG BUILD_ID
@@ -417,7 +417,7 @@ RUN --mount=target=/host \
 
 # =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^=
 # Creates an archive of kernel development sources and toolchain.
-FROM repobuild as kmodkitbuild
+FROM repobuild AS kmodkitbuild
 # The list of packages from the variant Cargo.toml package.metadata.build-variant.packages section.
 ARG PACKAGES
 ARG ARCH
@@ -461,7 +461,7 @@ COPY --from=kmodkitbuild /tmp/.${NOCACHE} /output/
 
 # =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^= =^..^=
 # Repack an existing image.
-FROM sdk as imgrepack
+FROM sdk AS imgrepack
 ARG ARCH
 ARG VERSION_ID
 ARG BUILD_ID
