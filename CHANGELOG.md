@@ -18,12 +18,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Prevent leaking tempfiles when executing krane ([#423], [#430])
+- Prevent leaking tempfiles when executing krane ([#423], [#430], [#433])
 - Stop dereferencing symlinks when traversing project directory ([#431])
+- Drop unnecessary `--all` flag from dnf, allowing builds using dnf5 ([#435])
 
 [#423]: https://github.com/bottlerocket-os/twoliter/pull/423
 [#430]: https://github.com/bottlerocket-os/twoliter/pull/430
 [#431]: https://github.com/bottlerocket-os/twoliter/pull/431
+[#433]: https://github.com/bottlerocket-os/twoliter/pull/433
+[#435]: https://github.com/bottlerocket-os/twoliter/pull/435
 
 [0.7.0]: https://github.com/bottlerocket-os/twoliter/compare/v0.6.0...v0.7.0
 
