@@ -691,6 +691,15 @@ impl DockerBuild {
         args.build_arg("NOCACHE", &self.common_build_args.nocache);
         args.build_arg("TOKEN", &self.common_build_args.token);
         args.build_arg("OUTPUT_SOCKET", &self.common_build_args.output_socket);
+
+        // Skip some build checks:
+        // - InvalidDefaultArgInFrom warns about the SDK argument, which is always set
+        // - SecretsUsedInArgOrEnv warns about the TOKEN argument, which is not a secret
+        args.build_arg(
+            "BUILDKIT_DOCKERFILE_CHECK",
+            "skip=InvalidDefaultArgInFrom,SecretsUsedInArgOrEnv",
+        );
+
         args
     }
 }
