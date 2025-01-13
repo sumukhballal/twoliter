@@ -40,7 +40,7 @@ for pkg in ${PACKAGES} ; do
 done
 
 createrepo_c "${KIT_DIR}"
-dnf --disablerepo '*' --repofrompath "kit,file:///${KIT_DIR}" repoquery --all
+dnf --disablerepo '*' --repofrompath "kit,file:///${KIT_DIR}" repoquery
 
 WORK_DIR="$(mktemp -d)"
 
