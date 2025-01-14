@@ -1,11 +1,9 @@
 mod image;
 mod lock;
-pub(crate) mod tasks;
 pub(crate) mod vendor;
 
 pub(crate) use self::image::{Image, ProjectImage, ValidIdentifier, VendedArtifact, Vendor};
 pub(crate) use self::vendor::ArtifactVendor;
-use lock::LockedImage;
 pub(crate) use lock::VerificationTagger;
 use path_absolutize::Absolutize;
 
@@ -174,10 +172,6 @@ impl<L: ProjectLock> Project<L> {
         self.project_dir.join(EXTERNAL_KIT_METADATA)
     }
 
-    pub(crate) fn external_sdk_archive_dir(&self) -> PathBuf {
-        self.project_dir.join("build/external-sdk-archives")
-    }
-
     pub(crate) fn schema_version(&self) -> SchemaVersion<1> {
         self.schema_version
     }
@@ -278,16 +272,17 @@ impl<L: ProjectLock> Project<L> {
     }
 }
 
-impl<T: LockedSDKProvider> Project<T> {
+impl Project<SDKLocked> {
     pub(crate) fn sdk_image(&self) -> ProjectImage {
-        self.as_project_image(self.lock.locked_sdk_image())
+        let SDKLocked(lock) = &self.lock;
+        self.as_project_image(&lock.0)
             .expect("Could not find SDK vendor despite lock resolution succeeding?")
     }
 }
 
 impl Project<Locked> {
     /// Fetches all external kits defined in a Twoliter.lock to the build directory
-    pub(crate) async fn fetch_kits(&self, arch: &str) -> Result<()> {
+    pub(crate) async fn fetch(&self, arch: &str) -> Result<()> {
         let Locked(lock) = &self.lock;
         lock.fetch(self, arch).await
     }

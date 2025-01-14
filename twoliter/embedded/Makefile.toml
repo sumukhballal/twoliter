@@ -13,6 +13,7 @@ BUILDSYS_BUILD_DIR = "${BUILDSYS_ROOT_DIR}/build"
 BUILDSYS_PACKAGES_DIR = "${BUILDSYS_BUILD_DIR}/rpms"
 BUILDSYS_KITS_DIR = "${BUILDSYS_BUILD_DIR}/kits"
 BUILDSYS_EXTERNAL_KITS_DIR = "${BUILDSYS_BUILD_DIR}/external-kits"
+BUILDSYS_EXTERNAL_SDKS_DIR = "${BUILDSYS_BUILD_DIR}/external-sdk-archives"
 BUILDSYS_STATE_DIR = "${BUILDSYS_BUILD_DIR}/state"
 BUILDSYS_IMAGES_DIR = "${BUILDSYS_BUILD_DIR}/images"
 BUILDSYS_LOGS_DIR = "${BUILDSYS_BUILD_DIR}/logs"
@@ -290,10 +291,62 @@ mkdir -p ${GO_MOD_CACHE}
 '''
 ]
 
+[tasks.setup-build]
+dependencies = ["setup"]
+script = [
+'''
+for cmd in docker gzip lz4; do
+  if ! command -v ${cmd} >/dev/null 2>&1 ; then
+    echo "required program '${cmd}' not found" >&2
+    exit 1
+  fi
+done
+'''
+]
+
 [tasks.fetch]
 dependencies = [
+  "fetch-sdk",
   "fetch-sources",
   "fetch-vendored",
+]
+
+[tasks.fetch-sdk]
+dependencies = ["setup-build"]
+script_runner = "bash"
+script = [
+'''
+
+cleanup() {
+   [ -n "${SDK_ARCHIVE_PATH}" ] && rm -rf "${SDK_ARCHIVE_PATH}"
+}
+
+trap 'cleanup' EXIT
+
+SDK_PLATFORM="$(docker version --format '{{.Server.Os}}/{{.Server.Arch}}')"
+KRANE="${TWOLITER_TOOLS_DIR}/krane"
+
+mkdir -p "${BUILDSYS_EXTERNAL_SDKS_DIR}"
+SDK_ARCHIVE_PATH="$(mktemp -p ${BUILDSYS_EXTERNAL_SDKS_DIR} bottlerocket-sdk-tmp-archive-XXXXXXXX.tar)"
+
+if [ ! -s "${BUILDSYS_EXTERNAL_KITS_DIR}/.sdk-verified" ]; then
+   echo "Twoliter could not validate '${TLPRIVATE_SDK_IMAGE}', refusing to continue" >&2
+   exit 1
+fi
+
+if ! docker image inspect "${TLPRIVATE_SDK_IMAGE}" >/dev/null 2>&1 ; then
+  echo "Pulling SDK '${TLPRIVATE_SDK_IMAGE}'"
+  if ! ${KRANE} pull "${TLPRIVATE_SDK_IMAGE}" "${SDK_ARCHIVE_PATH}" --platform "${SDK_PLATFORM}" ; then
+    echo "failed to pull '${TLPRIVATE_SDK_IMAGE}'" >&2
+    exit 1
+  fi
+
+  if ! docker load --input "${SDK_ARCHIVE_PATH}" ; then
+    echo "failed to load '${TLPRIVATE_SDK_IMAGE}' into docker daemon" >&2
+    exit 1
+  fi
+fi
+'''
 ]
 
 [tasks.fetch-sources]
@@ -311,7 +364,7 @@ chmod -R o+r ${CARGO_HOME}
 ]
 
 [tasks.fetch-vendored]
-dependencies = ["setup"]
+dependencies = ["fetch-sdk"]
 script = [
 '''
 go_fetch() {
@@ -331,7 +384,7 @@ done
 ]
 
 [tasks.unit-tests]
-dependencies = ["setup", "fetch-sources", "fetch-vendored"]
+dependencies = ["fetch-sdk", "fetch-sources", "fetch-vendored"]
 script = [
 '''
 export VARIANT="${BUILDSYS_VARIANT}"
@@ -586,7 +639,7 @@ fi
 ]
 
 [tasks.build-sbkeys]
-dependencies = ["setup"]
+dependencies = ["fetch-sdk"]
 script_runner = "bash"
 script = [
 '''
@@ -654,7 +707,7 @@ fi
 ]
 
 [tasks.boot-config]
-dependencies = ["setup"]
+dependencies = ["fetch-sdk"]
 script_runner = "bash"
 script = [
 '''
@@ -694,7 +747,7 @@ echo "Boot configuration initrd may be found at ${BOOT_CONFIG}"
 ]
 
 [tasks.validate-boot-config]
-dependencies = ["setup"]
+dependencies = ["fetch-sdk"]
 script_runner = "bash"
 script = [
 '''
@@ -855,7 +908,7 @@ ln -snf "${BUILDSYS_VERSION_FULL}" "${BUILDSYS_OUTPUT_DIR}/latest"
 ]
 
 [tasks.repack-variant]
-dependencies = ["setup", "build-sbkeys", "publish-setup", "cargo-metadata"]
+dependencies = ["fetch-sdk", "build-sbkeys", "publish-setup", "cargo-metadata"]
 script = [
 '''
 export PATH="${TWOLITER_TOOLS_DIR}:${PATH}"
@@ -1170,7 +1223,7 @@ pubsys \
 ]
 
 [tasks.ami]
-dependencies = ["setup"]
+dependencies = ["setup-build"]
 script_runner = "bash"
 script = [
 '''
@@ -1516,7 +1569,7 @@ pubsys \
 ]
 
 [tasks._upload-ova-base]
-dependencies = ["setup"]
+dependencies = ["setup-build"]
 script_runner = "bash"
 script = [
 '''
