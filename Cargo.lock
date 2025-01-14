@@ -1825,8 +1825,9 @@ dependencies = [
 name = "integration-tests"
 version = "0.1.0"
 dependencies = [
- "krane-static",
+ "libc",
  "tempfile",
+ "tokio",
  "toml",
  "twoliter",
 ]

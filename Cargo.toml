@@ -51,7 +51,7 @@ bottlerocket-types = { version = "0.0.14", git = "https://github.com/bottlerocke
 bottlerocket-variant = { version = "0.1", path = "tools/bottlerocket-variant" }
 buildsys = { version = "0.1", path = "tools/buildsys", lib = true, artifact = [ "bin:buildsys" ] }
 buildsys-config = { version = "0.1", path = "tools/buildsys-config" }
-krane-static = { version = "0.1", path = "tools/krane", artifact = [ "bin:krane-static" ], lib = true }
+krane-static = { version = "0.1", path = "tools/krane" }
 oci-cli-wrapper = { version = "0.1", path = "tools/oci-cli-wrapper" }
 parse-datetime = { version = "0.1", path = "tools/parse-datetime" }
 path-absolutize = "3.1"
