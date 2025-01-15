@@ -1896,11 +1896,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "krane-static"
+name = "krane-bundle"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "libc",
+ "flate2",
+ "lazy_static",
+ "tar",
+ "tempfile",
  "which",
 ]
 
@@ -2162,7 +2165,7 @@ name = "oci-cli-wrapper"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "krane-static",
+ "krane-bundle",
  "log",
  "olpc-cjson",
  "regex",
@@ -3920,7 +3923,7 @@ dependencies = [
  "filetime",
  "flate2",
  "futures",
- "krane-static",
+ "krane-bundle",
  "lazy_static",
  "log",
  "oci-cli-wrapper",

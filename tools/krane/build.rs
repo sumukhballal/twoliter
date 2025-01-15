@@ -1,38 +1,84 @@
-use std::env;
-use std::path::PathBuf;
+use flate2::{read::GzDecoder, write::GzEncoder};
+use std::fs::File;
+use std::io::{self, prelude::*};
+use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::{env, fs};
+use tar::Archive;
 
-const REQUIRED_TOOLS: &[&str] = &["go"];
+const CRANE_VERSION: &str = "0.20.1";
+
+const REQUIRED_TOOLS: &[&str] = &["patch", "go"];
 
 fn main() {
     let script_dir = env::current_dir().unwrap();
     let out_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
 
-    println!("cargo::rerun-if-changed=go-src");
+    println!("cargo::rerun-if-changed=../build-cache-fetch");
+    println!("cargo::rerun-if-changed=hashes/crane");
+    println!("cargo::rerun-if-changed=patches");
 
     ensure_required_tools_installed();
 
-    // build krane FFI wrapper
-    let build_output_loc = out_dir.join("libkrane.a");
-    let exit_status = Command::new("go")
+    // Download and checksum-verify crane
+    env::set_current_dir(&out_dir).expect("Failed to set current directory");
+    Command::new(script_dir.join("../build-cache-fetch"))
+        .arg(script_dir.join("hashes/crane"))
+        .status()
+        .expect("Failed to execute build-cache-fetch");
+
+    // extract crane sources
+    let crane_archive = out_dir.join(format!("go-containerregistry-v{CRANE_VERSION}.tar.gz"));
+    let crane_tgz = File::open(&crane_archive).expect("Failed to open crane archive");
+    let mut tar_archive = Archive::new(GzDecoder::new(crane_tgz));
+
+    let crane_output_dir = out_dir.join(format!("go-containerregistry-v{CRANE_VERSION}"));
+    tar_archive
+        .unpack(&crane_output_dir)
+        .expect("Failed to extract crane sources");
+
+    // Perform any local modifications
+    let crane_source_dir = crane_output_dir.join(format!("go-containerregistry-{CRANE_VERSION}"));
+    apply_source_patches(&crane_source_dir, script_dir.join("patches"));
+
+    // build krane
+    let build_output_loc = out_dir.join("krane");
+    Command::new("go")
+        .arg("build")
         .env("GOOS", get_goos())
         .env("GOARCH", get_goarch())
-        .arg("build")
-        .arg("-buildmode=c-archive")
         .arg("-o")
         .arg(&build_output_loc)
-        .arg("main.go")
-        .current_dir(script_dir.join("go-src"))
+        .current_dir(crane_source_dir.join("cmd/krane"))
         .status()
         .expect("Failed to build crane");
 
-    assert!(
-        exit_status.success(),
-        "Failed to build krane -- go compiler exited nonzero"
-    );
+    // compress krane
+    let krane_gz_path = out_dir.join("krane.gz");
+    let compressed_output_file =
+        File::create(&krane_gz_path).expect("Failed to crate krane.gz file");
 
-    println!("cargo:rustc-link-search=native={}", out_dir.display());
-    println!("cargo:rustc-link-lib=static=krane");
+    let krane_binary = File::open(&build_output_loc).expect("Failed to open krane binary");
+    let mut reader = io::BufReader::new(&krane_binary);
+    let mut encoder = GzEncoder::new(&compressed_output_file, flate2::Compression::best());
+
+    let mut buffer = Vec::with_capacity(
+        krane_binary
+            .metadata()
+            .expect("Failed to get krane binary metadata")
+            .len() as usize,
+    );
+    reader
+        .read_to_end(&mut buffer)
+        .expect("Failed to read krane binary");
+    encoder
+        .write_all(&buffer)
+        .expect("Failed to write compressed krane binary");
+    encoder
+        .finish()
+        .expect("Failed to finish writing compressed krane binary");
+
+    println!("cargo::rustc-env=KRANE_GZ_PATH={}", krane_gz_path.display());
 }
 
 fn ensure_required_tools_installed() {
@@ -42,12 +88,42 @@ fn ensure_required_tools_installed() {
     }
 }
 
+fn apply_source_patches(source_path: impl AsRef<Path>, patch_dir: impl AsRef<Path>) {
+    let source_path = source_path.as_ref();
+    let patch_dir = patch_dir.as_ref();
+
+    let mut patches = fs::read_dir(patch_dir)
+        .expect("Failed to read patch directory")
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|path| path.extension().map(|ext| ext == "patch").unwrap_or(false))
+        .collect::<Vec<_>>();
+    patches.sort();
+
+    for patch in patches {
+        println!("Executing `patch -p1 -i '{}'`", patch.display());
+
+        let patch_status = Command::new("patch")
+            .current_dir(source_path)
+            .arg("-p1")
+            .arg("-i")
+            .arg(patch.as_os_str())
+            .status()
+            .expect("Failed to execute patch command");
+
+        if !patch_status.success() {
+            panic!("Failed to apply patch '{}'", patch.display());
+        }
+    }
+}
+
 fn get_goos() -> &'static str {
     let target_os = env::var("CARGO_CFG_TARGET_OS").expect("Failed to read CARGO_CFG_TARGET_OS");
     match target_os.as_str() {
         "linux" => "linux",
         "windows" => "windows",
         "macos" => "darwin",
+        // Add more mappings as needed
         other => panic!("Unsupported target OS: {}", other),
     }
 }
@@ -61,6 +137,7 @@ fn get_goarch() -> &'static str {
         "aarch64" => "arm64",
         "arm" => "arm",
         "wasm32" => "wasm",
+        // Add more mappings as needed
         other => panic!("Unsupported target architecture: {}", other),
     }
 }

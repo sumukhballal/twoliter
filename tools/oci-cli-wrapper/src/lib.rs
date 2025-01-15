@@ -12,29 +12,36 @@
 //!     metadata. In addition, in order to operate with OCI image format, the containerd-snapshotter
 //!     feature has to be enabled in the docker daemon
 use std::fmt::{Display, Formatter};
-use std::sync::Arc;
 use std::{collections::HashMap, path::Path};
 
 use async_trait::async_trait;
+use cli::CommandLine;
 use crane::CraneCLI;
+use krane_bundle::KRANE;
 use olpc_cjson::CanonicalFormatter;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
 
+mod cli;
 mod crane;
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ImageTool {
-    image_tool_impl: Arc<dyn ImageToolImpl>,
+    image_tool_impl: Box<dyn ImageToolImpl>,
 }
 
 impl ImageTool {
-    /// Creates a new `ImageTool` using a statically linked `krane`.
-    pub fn krane() -> Self {
-        Self::new(Arc::new(CraneCLI))
+    /// Uses the builtin `krane` provided by the `tools/krane` crate.
+    pub fn from_builtin_krane() -> Self {
+        let image_tool_impl = Box::new(CraneCLI {
+            cli: CommandLine {
+                path: KRANE.path().to_path_buf(),
+            },
+        });
+        Self { image_tool_impl }
     }
 
-    pub fn new(image_tool_impl: Arc<dyn ImageToolImpl>) -> Self {
+    pub fn new(image_tool_impl: Box<dyn ImageToolImpl>) -> Self {
         Self { image_tool_impl }
     }
 
@@ -150,7 +157,6 @@ pub mod error {
     use std::path::PathBuf;
 
     use snafu::Snafu;
-    use tokio::task::JoinError;
 
     #[derive(Snafu, Debug)]
     #[snafu(visibility(pub(super)))]
@@ -161,20 +167,20 @@ pub mod error {
         #[snafu(display("Failed to read archive: {source}"))]
         ArchiveRead { source: std::io::Error },
 
+        #[snafu(display("Failed to execute image tool, {message}: {source}"))]
+        CommandFailed {
+            message: String,
+            source: std::io::Error,
+        },
+
         #[snafu(display("Failed to deserialize image config: {source}"))]
         ConfigDeserialize { source: serde_json::Error },
 
         #[snafu(display("Failed to create temporary directory for crane push: {source}"))]
         CraneTemp { source: std::io::Error },
 
-        #[snafu(display("Failed to call crane via FFI: {source}"))]
-        CraneFFI { source: krane_static::KraneError },
-
         #[snafu(display("Failed to create temporary directory for docker save: {source}"))]
         DockerTemp { source: std::io::Error },
-
-        #[snafu(display("Failed to join asynchronous task: {source}"))]
-        Fork { source: JoinError },
 
         #[snafu(display("invalid architecture '{value}'"))]
         InvalidArchitecture { value: String },
@@ -185,12 +191,30 @@ pub mod error {
         #[snafu(display("Failed to canonicalize image manifest: {source}"))]
         ManifestCanonicalize { source: serde_json::Error },
 
+        #[snafu(display("No digest returned by `docker load`"))]
+        NoDigest,
+
+        #[snafu(display(
+            "Unable to find any supported container image tool, please install docker or crane: {}",
+            source
+        ))]
+        NoneFound { source: which::Error },
+
+        #[snafu(display(
+            "Unable to find a container image tool by name '{}' in current environment",
+            name
+        ))]
+        NotFound { name: String, source: which::Error },
+
         #[snafu(display("Failed to run operation with image tool: {message}\n command: {} {}", program.display(), args.join(" ")))]
         OperationFailed {
             message: String,
             program: PathBuf,
             args: Vec<String>,
         },
+
+        #[snafu(display("Failed to parse kit filename: {}", source))]
+        Regex { source: regex::Error },
 
         #[snafu(display("Unsupported container image tool '{}'", name))]
         Unsupported { name: String },
