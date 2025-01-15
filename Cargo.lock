@@ -1068,16 +1068,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "ctrlc"
-version = "3.4.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "672465ae37dc1bc6380a6547a8883d5dd397b0f1faaad4f265726cc7042a5345"
-dependencies = [
- "nix",
- "windows-sys 0.52.0",
-]
-
-[[package]]
 name = "daemonize"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1825,8 +1815,9 @@ dependencies = [
 name = "integration-tests"
 version = "0.1.0"
 dependencies = [
- "krane-static",
+ "libc",
  "tempfile",
+ "tokio",
  "toml",
  "twoliter",
 ]
@@ -1905,11 +1896,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "krane-static"
+name = "krane-bundle"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "libc",
+ "flate2",
+ "lazy_static",
+ "tar",
+ "tempfile",
  "which",
 ]
 
@@ -2171,7 +2165,7 @@ name = "oci-cli-wrapper"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "krane-static",
+ "krane-bundle",
  "log",
  "olpc-cjson",
  "regex",
@@ -3914,7 +3908,7 @@ dependencies = [
 
 [[package]]
 name = "twoliter"
-version = "0.7.0-rc1"
+version = "0.7.0-rc2"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -3925,12 +3919,11 @@ dependencies = [
  "buildsys-config",
  "bytes",
  "clap",
- "ctrlc",
  "env_logger",
  "filetime",
  "flate2",
  "futures",
- "krane-static",
+ "krane-bundle",
  "lazy_static",
  "log",
  "oci-cli-wrapper",

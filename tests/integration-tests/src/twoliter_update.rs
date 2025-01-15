@@ -34,7 +34,10 @@ fn test_twoliter_build_and_update() {
             "--project-path",
             external_kit.join("Twoliter.toml").to_str().unwrap(),
         ],
-        [],
+        [
+            ("TWOLITER_KIT_IMAGE_TOOL", "crane"),
+            ("SSL_CERT_FILE", registry.cert_file().to_str().unwrap()),
+        ],
     );
 
     assert!(output.status.success());
@@ -70,7 +73,7 @@ fn test_twoliter_build_and_update() {
 struct LocalKit;
 
 impl LocalKit {
-    fn build(_registry: &KitRegistry) {
+    fn build(registry: &KitRegistry) {
         let local_kit = test_projects_dir().join("local-kit");
 
         run_command(
@@ -117,7 +120,7 @@ impl LocalKit {
                 "bottlerocket",
                 "core-kit-overridden",
             ],
-            [],
+            [("SSL_CERT_FILE", registry.cert_file().to_str().unwrap())],
         );
     }
 }

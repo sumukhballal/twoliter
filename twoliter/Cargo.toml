@@ -1,6 +1,6 @@
 [package]
 name = "twoliter"
-version = "0.7.0-rc1"
+version = "0.7.0-rc2"
 edition = "2021"
 description = "A command line tool for creating custom builds of Bottlerocket"
 authors = ["Matthew James Briggs <brigmatt@amazon.com>"]
@@ -17,12 +17,11 @@ async-trait.workspace = true
 base64.workspace = true
 buildsys-config.workspace = true
 clap = { workspace = true, features = ["derive", "env", "std"] }
-ctrlc = { workspace = true, features = ["termination"] }
 env_logger.workspace = true
 filetime.workspace = true
 flate2.workspace = true
 futures.workspace = true
-krane-static.workspace = true
+krane-bundle.workspace = true
 lazy_static.workspace = true
 log.workspace = true
 oci-cli-wrapper.workspace = true

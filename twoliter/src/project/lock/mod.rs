@@ -13,13 +13,12 @@ mod verification;
 mod views;
 
 pub(crate) use self::verification::VerificationTagger;
-pub(crate) use image::LockedImage;
 
 use crate::common::fs::{create_dir_all, read, write};
 use crate::project::{Project, ValidIdentifier};
 use crate::schema_version::SchemaVersion;
 use anyhow::{bail, ensure, Context, Result};
-use image::ImageResolver;
+use image::{ImageResolver, LockedImage};
 use oci_cli_wrapper::ImageTool;
 use olpc_cjson::CanonicalFormatter as CanonicalJsonFormatter;
 use semver::Version;
@@ -104,9 +103,10 @@ impl LockedSDK {
         };
 
         debug!(?sdk, "Resolving workspace SDK");
+        let image_tool = ImageTool::from_builtin_krane();
         ImageResolver::from_image(&sdk)?
             .skip_metadata_retrieval() // SDKs don't have metadata
-            .resolve(&ImageTool::krane())
+            .resolve(&image_tool)
             .await
             .map(|(sdk, _)| Some(Self(sdk)))
     }
@@ -203,6 +203,7 @@ impl Lock {
     /// Fetches all external kits defined in a Twoliter.lock to the build directory
     #[instrument(level = "trace", skip_all)]
     pub(crate) async fn fetch(&self, project: &Project<Locked>, arch: &str) -> Result<()> {
+        let image_tool = ImageTool::from_builtin_krane();
         let target_dir = project.external_kits_dir();
         create_dir_all(&target_dir).await.context(format!(
             "failed to create external-kits directory at {}",
@@ -217,7 +218,7 @@ impl Lock {
             let image = project.as_project_image(image)?;
             let resolver = ImageResolver::from_image(&image)?;
             resolver
-                .extract(&ImageTool::krane(), &project.external_kits_dir(), arch)
+                .extract(&image_tool, &project.external_kits_dir(), arch)
                 .await?;
         }
 
@@ -256,6 +257,7 @@ impl Lock {
     async fn resolve(project: &Project<Unlocked>) -> Result<Self> {
         let mut known: HashMap<(ValidIdentifier, ValidIdentifier), Version> = HashMap::new();
         let mut locked: Vec<LockedImage> = Vec::new();
+        let image_tool = ImageTool::from_builtin_krane();
         let mut remaining = project.direct_kit_deps()?;
 
         let mut sdk_set = HashSet::new();
@@ -290,7 +292,7 @@ impl Lock {
                     image.version().clone(),
                 );
                 let image_resolver = ImageResolver::from_image(image)?;
-                let (locked_image, metadata) = image_resolver.resolve(&ImageTool::krane()).await?;
+                let (locked_image, metadata) = image_resolver.resolve(&image_tool).await?;
                 let metadata = metadata.context(format!(
                     "failed to validate kit image with name {} from vendor {}",
                     locked_image.name, locked_image.vendor
@@ -320,7 +322,7 @@ impl Lock {
         debug!(?sdk, "Resolving workspace SDK");
         let (sdk, _metadata) = ImageResolver::from_image(sdk)?
             .skip_metadata_retrieval() // SDKs don't have metadata
-            .resolve(&ImageTool::krane())
+            .resolve(&image_tool)
             .await?;
 
         Ok(Self {

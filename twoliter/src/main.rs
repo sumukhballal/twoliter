@@ -3,7 +3,6 @@ use anyhow::Result;
 use clap::Parser;
 
 mod cargo_make;
-pub(crate) mod cleanup;
 mod cmd;
 mod common;
 mod compatibility;
