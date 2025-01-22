@@ -21,6 +21,7 @@ use nonzero_ext::nonzero;
 use pipesys::server::Server as PipesysServer;
 use rand::Rng;
 use regex::Regex;
+use semver::{Comparator, Op, Prerelease, Version, VersionReq};
 use sha2::{Digest, Sha512};
 use snafu::{ensure, OptionExt, ResultExt};
 use std::collections::HashSet;
@@ -87,6 +88,23 @@ lazy_static! {
         r#"C_CREATEREPOLIB: Warning: read_header: rpmReadPackageFile() error"#
     ))
     .unwrap();
+}
+
+/*
+Twoliter relies on minimum Dockerfile syntax 1.4.3, which is shipped in Docker 23.0.0 by default
+We do not use explicit `syntax=` directives to avoid network connections during the build.
+*/
+lazy_static! {
+    static ref MINIMUM_DOCKER_VERSION: VersionReq = VersionReq {
+        comparators: [Comparator {
+            op: Op::GreaterEq,
+            major: 23,
+            minor: None,
+            patch: None,
+            pre: Prerelease::default(),
+        }]
+        .into()
+    };
 }
 
 static DOCKER_BUILD_MAX_ATTEMPTS: NonZeroU16 = nonzero!(10u16);
@@ -558,6 +576,8 @@ impl DockerBuild {
     }
 
     pub(crate) fn build(&self) -> Result<()> {
+        check_docker_version()?;
+
         env::set_current_dir(&self.root_dir).context(error::DirectoryChangeSnafu {
             path: &self.root_dir,
         })?;
@@ -749,6 +769,66 @@ enum Retry<'a> {
         attempts: NonZeroU16,
         messages: &'a [&'static Regex],
     },
+}
+
+// =^..^=   =^..^=   =^..^=   =^..^=   =^..^=   =^..^=   =^..^=   =^..^=   =^..^=   =^..^=   =^..^=
+
+pub fn docker_server_version() -> Result<Version> {
+    let docker_version_out = cmd("docker", ["version", "--format", "{{.Server.Version}}"])
+        .stderr_to_stdout()
+        .stdout_capture()
+        .unchecked()
+        .run()
+        .context(error::CommandStartSnafu)?;
+    let version_str = String::from_utf8_lossy(&docker_version_out.stdout)
+        .trim()
+        .to_string();
+
+    Version::parse(&version_str).context(error::VersionParseSnafu { version_str })
+}
+
+fn check_docker_version() -> Result<()> {
+    let docker_version = docker_server_version()?;
+
+    snafu::ensure!(
+        MINIMUM_DOCKER_VERSION.matches(&docker_version),
+        error::DockerVersionRequirementSnafu {
+            installed_version: docker_version,
+            required_version: MINIMUM_DOCKER_VERSION.clone()
+        }
+    );
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use semver::Version;
+
+    #[test]
+    fn test_docker_version_req_25_0_5_passes() {
+        let version = Version::parse("25.0.5").unwrap();
+        assert!(MINIMUM_DOCKER_VERSION.matches(&version))
+    }
+
+    #[test]
+    fn test_docker_version_req_27_1_4_passes() {
+        let version = Version::parse("27.1.4").unwrap();
+        assert!(MINIMUM_DOCKER_VERSION.matches(&version))
+    }
+
+    #[test]
+    fn test_docker_version_req_18_0_9_fails() {
+        let version = Version::parse("18.0.9").unwrap();
+        assert!(!MINIMUM_DOCKER_VERSION.matches(&version))
+    }
+
+    #[test]
+    fn test_docker_version_req_20_10_27_fails() {
+        let version = Version::parse("20.10.27").unwrap();
+        assert!(!MINIMUM_DOCKER_VERSION.matches(&version))
+    }
 }
 
 // =^..^=   =^..^=   =^..^=   =^..^=   =^..^=   =^..^=   =^..^=   =^..^=   =^..^=   =^..^=   =^..^=

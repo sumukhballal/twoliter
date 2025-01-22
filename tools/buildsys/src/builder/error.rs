@@ -22,6 +22,16 @@ pub(crate) enum Error {
     #[snafu(display("Failed to execute command: 'docker {}'", args))]
     DockerExecution { args: String },
 
+    #[snafu(display(
+        "The installed docker ('{}') does not meet the minimum version requirement ('{}')",
+        installed_version,
+        required_version
+    ))]
+    DockerVersionRequirement {
+        installed_version: semver::Version,
+        required_version: semver::VersionReq,
+    },
+
     #[snafu(display("Failed to change directory to '{}': {}", path.display(), source))]
     DirectoryChange {
         path: PathBuf,
@@ -90,6 +100,12 @@ pub(crate) enum Error {
     #[snafu(display("Failed to parse variant: {source}"))]
     VariantParse {
         source: bottlerocket_variant::error::Error,
+    },
+
+    #[snafu(display("Failed to parse version string '{version_str}': {source}"))]
+    VersionParse {
+        source: semver::Error,
+        version_str: String,
     },
 }
 
